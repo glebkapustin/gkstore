@@ -1,0 +1,463 @@
+using System;
+using System.Collections;
+
+
+public struct Coords {
+    public int x, y;
+
+    public Coords(int x, int y) 
+    {
+        this.x = x;
+        this.y = y;
+    }
+
+    public void Update(int x, int y)
+    {
+        this.x = x;
+        this.y = y;
+    }
+}
+
+public struct Buttons {
+    public string left, right;
+
+    public Buttons(string left, string right) 
+    {
+        this.left =     left;
+        this.right =    right;
+    }
+}
+
+public struct Borders
+{
+    public int leftBorder, rightBorder, topBorder, bottomBorder;
+    
+    public Borders(int left, int top, int right, int bottom)
+    {
+        leftBorder =    left;
+        topBorder = top;
+        rightBorder =   right;
+        bottomBorder =  bottom;
+    }
+}
+
+public struct Colors
+{
+    public ConsoleColor rabbitColor, snakeColor, obstructionColor, bgColor;
+    public Colors(ConsoleColor r, ConsoleColor s, ConsoleColor o, ConsoleColor bg)
+    {
+        rabbitColor = r;
+        snakeColor = s;
+        obstructionColor = o;
+        bgColor = bg;
+    }
+}
+
+public struct Symbols
+{
+    public char rabbitSymbol, snakeSymbol, obstructionSymbol, nullSymbol;
+
+    public Symbols(char r, char s, char o, char n)
+    {
+        rabbitSymbol = r;
+        snakeSymbol = s;
+        obstructionSymbol = o;
+        nullSymbol = n;
+    }
+}
+
+public enum Deads {
+    border, self, obstruction
+}
+
+public enum Directions 
+{
+    up, down, left, right
+}
+
+public class Element 
+{   
+    public Coords coords;
+    public char symbol;
+    public ConsoleColor color;
+    public Element(int x, int y, char symbol, ConsoleColor color) 
+    {
+        coords = new Coords(x, y);
+        this.symbol = symbol;
+        this.color = color;
+    }
+
+    public void Draw()
+    {
+        Console.SetCursorPosition(coords.x, coords.y);
+        Console.ForegroundColor = color;
+        Console.Write(symbol);
+    }
+}
+
+
+public class Rabbit : Element
+{
+    public Rabbit(int x, int y, char s, ConsoleColor color) : base(x, y, s, color) 
+    {
+    }
+}
+
+public class Elements : ArrayList
+{
+    public bool alive;
+    public int startcol;
+    public Elements(bool alive, int startcol) : base()
+    {
+        this.alive = alive;
+        this.startcol = startcol;
+        
+    }
+    public void Draw() { 
+        foreach (Element a in this)
+        a.Draw();
+    }
+    public bool CheckPoint(Coords c)
+    {
+        foreach (Element a in this) {
+            if (c.Equals(a.coords))
+            return true;
+        }
+        return false;
+    }
+}
+
+public class Snake : Elements {
+    public Snake(bool alive, int startcol) : base(alive, startcol)    {
+    }
+}
+
+  
+public class EGame
+{
+    public Rabbit       rabbit;
+    public Snake        snake;
+    public ArrayList    gameObjects;
+    public Borders      borders;
+    public Buttons      arrows;
+    public Directions   direction { get; set; }
+    public Colors       colors;
+    public Symbols      symbols;
+    public Deads        deads;
+    public bool         endGame, eaten;
+    public Element      lastElement;
+    public int          lenthS; 
+    public int          lenthO;
+    public int          colObstructions;
+    public Coords       startpoint;
+    
+    public EGame(int w, int h, Symbols symbols, Colors colors, Buttons controls, Coords startpoint, int lenthS, int lenthO , int colobst)
+    {
+        this.colors = colors;
+        this.symbols = symbols;
+        this.startpoint = startpoint;
+        this.lenthS = lenthS;
+        this.lenthO = lenthO;
+        arrows = controls;
+        borders = new Borders(0, 0, w, h);
+        gameObjects = new ArrayList();
+        snake = CreateSnake();
+        snake.Draw();
+        gameObjects.Add(snake);
+        endGame = false;
+        lastElement = new Element(0, 0, symbols.nullSymbol, colors.bgColor);
+        direction = Directions.right;
+        colObstructions = colobst;
+        CreateObstructions();
+        rabbit = CreateRabbit();
+        rabbit.Draw();
+    }
+
+    public void UpdateDirection(string s)
+    {   //Изменяем направление движения удава в зависимости от нажатой клавиши 
+        
+        if (s == arrows.left)
+        {
+            switch (direction)
+            {
+                case Directions.right:
+                    direction = Directions.up;
+                    break;
+                case Directions.up:
+                    direction = Directions.left;
+                    break;
+                case Directions.left:
+                    direction = Directions.down;
+                    break;
+                case Directions.down:
+                    direction = Directions.right;
+                    break;
+            }
+        }
+
+        if (s == arrows.right)
+        {
+            switch (direction)
+            {
+                case Directions.right:
+                    direction = Directions.down;
+                    break;
+                case Directions.down:
+                    direction = Directions.left;
+                    break;
+                case Directions.left:
+                    direction = Directions.up;
+                    break;
+                case Directions.up:
+                    direction = Directions.right;
+                    break;
+            }
+        }
+    }
+
+    public Coords GetRandomCoords()
+    {   // Получаем случайным образом пару координат в рамках окна
+        Random rnd = new Random();
+        int x, y;
+        Coords c = new Coords(0, 0);
+        x = rnd.Next(borders.leftBorder + 1, borders.rightBorder - 1);
+        y = rnd.Next(borders.topBorder + 1, borders.bottomBorder - 1);
+        c.Update(x, y);
+        return c;
+    }
+
+    public Elements getRandomElements()
+    {   // Создаем случайным образом новый игровой объект (препятствие)
+        int d;
+        Coords c;
+        Random r = new Random();
+        Elements e = new Elements(false, lenthO);
+        d = r.Next(1, 3);
+        c = GetRandomCoords();
+        e.Add(new Element(c.x, c.y, symbols.obstructionSymbol, colors.obstructionColor));
+        for (int i = 0; i < lenthO; ++i)
+        {
+            if (d == 1) //вертикальное препятствие
+
+                e.Add(new Element(c.x, c.y + i, symbols.obstructionSymbol, colors.obstructionColor));
+
+            else        //горизонтальное препятствие
+                e.Add(new Element(c.x + i, c.y, symbols.obstructionSymbol, colors.obstructionColor));
+        }
+
+        return e;
+    }
+
+    public bool CheckElements(Elements e)
+    {   // Проверка игрового объекта на пересечение с существующими 
+        bool f = false;
+        foreach (Element item in e)
+        {
+            foreach (Elements item1 in gameObjects)
+            {
+                f = item1.CheckPoint(item.coords);
+                if (f) return f;
+            }
+
+            f = (item.coords.x < borders.leftBorder) ^ 
+                (item.coords.x > borders.rightBorder) ^ 
+                (item.coords.y < borders.topBorder) ^ 
+                (item.coords.y > borders.bottomBorder);
+            if (f) return f;
+        }
+        return f;
+    }
+    public void CreateObstructions()
+    {   // Создаем препятствия, проверяем их на пересечение с существующими объектами.
+        // Если пересечений нет, добавляем препятствие в коллекцию объектов 
+        Elements obstruction;
+        int i = 0;
+    
+        while (i < colObstructions)
+        {
+            obstruction = getRandomElements();
+            if (!CheckElements(obstruction))
+            {
+                obstruction.Draw();
+                gameObjects.Add(obstruction);
+                i = i + 1;
+            }
+        }
+
+    }
+
+    public Rabbit CreateRabbit()
+    {   // Cоздаем случайным образом координаты кролика и проверяем их на попадание на препятствия и на удава
+        // И прпятсnвия, и удав я входят в коллекцию gameObjects 
+        // Если координаты не совпадают с координатами всех существующих элементов, создаем кролика
+        Rabbit r;
+        Coords c = GetRandomCoords(); 
+        bool f = true;
+        
+        while (f) {
+            c = GetRandomCoords();
+            foreach (Elements item in gameObjects)
+            {
+                f = item.CheckPoint(c);
+                if (f) break;
+               
+            }
+        }
+        r = new Rabbit(c.x, c.y, symbols.rabbitSymbol, colors.rabbitColor);
+        return r;
+    }
+
+    public Snake CreateSnake() { // 
+        Snake s;
+        s = new Snake(true, lenthS);
+        for (int i = 0; i < lenthS; i++)
+        {
+            s.Add(new Element(startpoint.x + i, startpoint.y, symbols.snakeSymbol, colors.snakeColor));
+        }
+        return s;
+    }
+
+    public void Move()
+    {
+        Coords coords;
+        Element point;
+        point = (Element)snake[snake.Count-1]; // получаем элемент удавчика (голову)
+        coords = point.coords;
+
+        switch (direction)
+        { // в зависимости от направления движения головы удавчика, меняем координаты последнего элемента (это в нашем случае голова удава)
+            case Directions.right:
+                coords.Update(++coords.x, coords.y);
+                break;
+            case Directions.left:
+                coords.Update(--coords.x, coords.y);
+                break;
+            case Directions.up:
+                coords.Update(coords.x, --coords.y);
+                break;
+            case Directions.down:
+                coords.Update(coords.x, ++coords.y);
+                break;
+        }
+
+        // проверка попадания на удавчика
+        if (snake.CheckPoint(coords)) 
+        {
+            deads = Deads.self;
+            endGame = true;
+        }
+
+        // проверка попадания на препятствие. Удавчик здесь снова попадает на проверку, но это не принципиально
+        if (!endGame)
+        { 
+            foreach (Elements item in gameObjects)
+            {
+                if (item.CheckPoint(coords))
+                {
+                    deads = Deads.obstruction;
+                    endGame = true;
+                    break;
+                }
+            }
+        }
+        
+        // проверка выхода за границы окна
+        if (!endGame)
+        { 
+            if ((coords.x < borders.leftBorder) ^ (coords.y < borders.topBorder) ^ (coords.x > borders.rightBorder) ^ (coords.y > borders.bottomBorder)) 
+            {
+                deads = Deads.border;
+                endGame = true;
+            }
+        }
+
+        // проверка съеден ли кролик
+        if (!endGame)
+        {
+            if (rabbit.coords.Equals(coords)) 
+            {
+                eaten = true;
+                Element e = new Element(coords.x, coords.y, symbols.snakeSymbol, colors.snakeColor);
+                e.Draw();
+                snake.Add(e);
+                rabbit = CreateRabbit();
+                rabbit.Draw();
+            }
+
+            else
+            {
+                Element item3 = (Element)snake[0];
+                lastElement.coords.Update(item3.coords.x, item3.coords.y);
+
+                for (int i = 0; i < snake.Count-1; i++) {
+                    Element item = (Element)snake[i];
+                    Element item1 = (Element)snake[i + 1];
+                    item.coords.Update(item1.coords.x, item1.coords.y);
+                }
+                    Element item2 = (Element)snake[snake.Count-1];
+                    lastElement.Draw();
+                    item2.coords.Update(coords.x, coords.y);
+                    item2.Draw();
+            }
+        }
+    }
+}
+
+
+namespace ConsoleApp4
+
+{
+    public class Program
+    {
+        public static void InitWindow(int w, int h, ConsoleColor c) {
+            Console.SetWindowSize(w, h);
+            Console.CursorVisible = false;
+            Console.BackgroundColor = c;
+        }
+
+        public static bool EndOfGame(int length, string reason) {
+
+            Console.Clear();
+            Console.SetCursorPosition(1, 15);
+            Console.WriteLine("Game over");
+            Console.WriteLine(String.Format("Length of your snake is {0}", length));
+            Console.WriteLine(String.Format("The reason of the death is {0}", reason));
+            Console.WriteLine("Would you like to play one more game? Y/N");
+            return Console.ReadKey(true).Key.ToString() != "Y";
+        }
+        public static void Main()
+        {
+            bool exit = false;
+            int wWidth = 80;
+            int wHight = 30;
+            int tSleep = 150;
+            int lenthS = 4;
+            int lenthO = 4;
+            int colObst = 5;
+            Buttons arrows = new Buttons("LeftArrow", "RightArrow");
+            Coords startcoords = new Coords(8, 1);
+            InitWindow(wWidth, wHight, ConsoleColor.White);
+            Symbols symbols = new Symbols('K', '*', 'X', ' ');
+            Colors colors = new Colors(ConsoleColor.Red, ConsoleColor.Black, ConsoleColor.Blue, ConsoleColor.White);
+
+            while (exit == false)
+            {
+                Console.Clear();
+                EGame mGame = new EGame(wWidth, wHight, symbols, colors, arrows, startcoords, lenthS, lenthO, colObst);
+                while (!mGame.endGame)
+                {
+                    System.Threading.Thread.Sleep(tSleep);
+                    if (Console.KeyAvailable == true) // Button has been  pressed
+                    {
+                        string s = Console.ReadKey(true).Key.ToString();
+                        mGame.UpdateDirection(s);
+                    }
+                    mGame.Move();
+                    Console.Title = String.Format("Lenght of snake = {0}", mGame.snake.Count);
+                }
+
+                exit = EndOfGame(mGame.snake.Count, mGame.deads.ToString());
+            }
+        }
+    }
+}
